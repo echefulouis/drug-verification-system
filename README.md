@@ -28,6 +28,10 @@ The NAFDAC Drug Verification System is an enterprise-grade application that help
 
 **Live Demo**: [https://d3rq7qov4uj0bg.cloudfront.net](https://d3rq7qov4uj0bg.cloudfront.net)
 
+<div align="center">
+  <img src=".docs/image.png" alt="Frontend Application" width="600" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+</div>
+
 ### Key Capabilities
 
 - **Dual Verification Modes**: Upload product images or manually enter NAFDAC registration numbers

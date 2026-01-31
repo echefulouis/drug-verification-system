@@ -255,6 +255,16 @@ function App() {
     handleCancel()
   }
 
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      // Optional: Show a brief success indicator
+      alert('Copied to clipboard!')
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+  }
+
   return (
     <div className="app">
       <header className="header">
@@ -287,52 +297,56 @@ function App() {
 
             {verificationMode === 'image' ? (
               <>
-                <p style={{ marginTop: '1.5rem' }}>Take a clear photo of the product showing the NAFDAC registration number</p>
+                {!isLoading && (
+                  <>
+                    <p style={{ marginTop: '1.5rem' }}>Take a clear photo of the product showing the NAFDAC registration number</p>
 
-                <div
-                  className={`upload-area ${isDragging ? 'drag-over' : ''}`}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <div className="upload-icon">📸</div>
-                  <h3>Drag & Drop or Click to Upload</h3>
-                  <p>Supports: JPEG, PNG, HEIC (Max 10MB)</p>
-                  <button className="upload-button" type="button">
-                    Choose Image
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    className="file-input"
-                    accept="image/*"
-                    onChange={handleFileInputChange}
-                  />
-                </div>
+                    <div
+                      className={`upload-area ${isDragging ? 'drag-over' : ''}`}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <div className="upload-icon">📸</div>
+                      <h3>Drag & Drop or Click to Upload</h3>
+                      <p>Supports: JPEG, PNG, HEIC (Max 10MB)</p>
+                      <button className="upload-button" type="button">
+                        Choose Image
+                      </button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="file-input"
+                        accept="image/*"
+                        onChange={handleFileInputChange}
+                      />
+                    </div>
 
-                {selectedFile && previewUrl && (
-                  <div className="preview-section">
-                    <div className="image-preview">
-                      <img src={previewUrl} alt="Product preview" />
-                    </div>
-                    <div className="action-buttons">
-                      <button
-                        className="verify-button"
-                        onClick={handleVerify}
-                        disabled={isLoading}
-                      >
-                        {isLoading ? 'Verifying...' : '✓ Verify Product'}
-                      </button>
-                      <button
-                        className="cancel-button"
-                        onClick={handleCancel}
-                        disabled={isLoading}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
+                    {selectedFile && previewUrl && (
+                      <div className="preview-section">
+                        <div className="image-preview">
+                          <img src={previewUrl} alt="Product preview" />
+                        </div>
+                        <div className="action-buttons">
+                          <button
+                            className="verify-button"
+                            onClick={handleVerify}
+                            disabled={isLoading}
+                          >
+                            {isLoading ? 'Verifying...' : '✓ Verify Product'}
+                          </button>
+                          <button
+                            className="cancel-button"
+                            onClick={handleCancel}
+                            disabled={isLoading}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             ) : (
@@ -444,7 +458,16 @@ function App() {
                             </div>
                             <div className="detail-row">
                               <span className="detail-label">NAFDAC Number:</span>
-                              <span className="detail-value">{product.nrn}</span>
+                              <span className="detail-value">
+                                {product.nrn}
+                                <button 
+                                  className="copy-button"
+                                  onClick={() => copyToClipboard(product.nrn)}
+                                  title="Copy NAFDAC number"
+                                >
+                                  📋
+                                </button>
+                              </span>
                             </div>
                             <div className="detail-row">
                               <span className="detail-label">Status:</span>

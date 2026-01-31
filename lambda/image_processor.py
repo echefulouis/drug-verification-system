@@ -33,16 +33,29 @@ def store_image_in_s3(image_data: bytes, verification_id: str, timestamp: str) -
     return s3_key
 
 
-def extract_product_name_with_bedrock(image_data: bytes) -> str:
-    """Use AWS Bedrock (Claude) to extract product name from image"""
+def extract_product_name_with_bedrock(image_data: bytes, ocr_text: str = None) -> str:
+    """Use AWS Bedrock (Claude) to extract product name from image with OCR context"""
     try:
         logger.info("Using Bedrock to extract product name")
         
         image_base64 = base64.b64encode(image_data).decode('utf-8')
         
+        # Build prompt with OCR context if available
+        if ocr_text:
+            prompt = f"""Here is the OCR text extracted from this pharmaceutical product image:
+
+{ocr_text}
+
+Based on the image and the OCR text above, extract ONLY the main drug/product name. 
+Return just the product name, nothing else (no dosage, no manufacturer, no extra words).
+Ensure correct spelling by cross-referencing the image and text.
+Example: If you see "Lisinopril 10mg Tablets", return only "Lisinopril"."""
+        else:
+            prompt = "Extract only the main drug/product name from this pharmaceutical product. Return just the name, nothing else (no dosage, no manufacturer). Ensure correct spelling."
+        
         request_body = {
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 50,
+            "max_tokens": 30,
             "messages": [{
                 "role": "user",
                 "content": [
@@ -56,7 +69,7 @@ def extract_product_name_with_bedrock(image_data: bytes) -> str:
                     },
                     {
                         "type": "text",
-                        "text": "Extract only the drug name from this pharmaceutical product. Return just the name, nothing else. Keep hyphens if present."
+                        "text": prompt
                     }
                 ]
             }]
@@ -96,18 +109,19 @@ def extract_nafdac_number_ocr(s3_key: str, image_data: bytes = None) -> dict:
                 confidence = block.get('Confidence', 0)
                 all_text.append(text)
                 
+                # NAFDAC format: [Letter][1-2 digits]-[4-6 digits] OR [2 digits]-[4-6 digits]
+                # Examples: A4-1650, B4-1650, 04-1650, A4-100074
                 nafdac_patterns = [
-                    r'[A-Z]\d{1,2}-\d{4,6}',
-                    r'\d{2}-\d{4,6}',
-                    r'NAFDAC[:\s]*([A-Z0-9-]+)',
-                    r'REG[:\s]*([A-Z0-9-]+)',
-                    r'NRN[:\s]*([A-Z0-9-]+)',
+                    r'\b[A-Z]\d{1,2}\s*-\s*\d{4,6}\b',  # Matches A4-1650, B4 - 1650, etc.
+                    r'\b\d{2}\s*-\s*\d{4,6}\b',  # Matches 04-1650, 01 - 1234, etc.
                 ]
                 
                 for pattern in nafdac_patterns:
                     for match in re.finditer(pattern, text, re.IGNORECASE):
-                        nafdac_num = (match.group(1) if match.lastindex else match.group(0)).strip().upper()
-                        nafdac_num = re.sub(r'^(NAFDAC|REG|NRN)[:\s]*', '', nafdac_num, flags=re.IGNORECASE)
+                        nafdac_num = match.group(0).strip().upper()
+                        # Normalize: Remove spaces around hyphen "B4 - 1650" -> "B4-1650"
+                        nafdac_num = re.sub(r'\s*-\s*', '-', nafdac_num)
+                        
                         nafdac_candidates.append({'number': nafdac_num, 'confidence': confidence})
                         logger.info(f"Found NAFDAC: {nafdac_num} ({confidence}%)")
         
@@ -125,8 +139,8 @@ def extract_nafdac_number_ocr(s3_key: str, image_data: bytes = None) -> dict:
             }
         
         # No NAFDAC found - use Bedrock for product name
-        logger.warning("No NAFDAC found, using Bedrock")
-        product_name = extract_product_name_with_bedrock(image_data) if image_data else None
+        logger.warning("No NAFDAC found, using Bedrock with OCR context")
+        product_name = extract_product_name_with_bedrock(image_data, full_text) if image_data else None
         
         return {
             'nafdacNumber': None,

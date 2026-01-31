@@ -42,8 +42,11 @@ def scrape_nafdac_greenbook(nafdac_number: str = None, product_name: str = None)
         search_type = "NAFDAC number"
     else:
         search_field_id = 'search_product'
-        search_term = product_name
+        # Use only the first word to avoid hyphen/space/punctuation issues
+        search_term = product_name.split()[0] if product_name and product_name.split() else product_name
         search_type = "product name"
+        if search_term != product_name:
+            logger.info(f"Using first word from '{product_name}' → searching for '{search_term}'")
     
     logger.info(f"Starting NAFDAC Greenbook scraping for {search_type}: {search_term}")
     
@@ -81,7 +84,7 @@ def scrape_nafdac_greenbook(nafdac_number: str = None, product_name: str = None)
             search_input.send_keys(search_term)
             
             logger.info("Waiting for results...")
-            time.sleep(3)  # Give time for AJAX
+            time.sleep(4)  # Give time for AJAX
             
             try:
                 wait.until(
@@ -113,8 +116,18 @@ def scrape_nafdac_greenbook(nafdac_number: str = None, product_name: str = None)
                         'nrn': cells[3].text.strip(),
                         'status': cells[9].text.strip(),
                     }
-                    results.append(result)
-                    logger.info(f"Found product: {result['product_name']}")
+                    
+                    # Filter: if searching by NAFDAC number, only include exact matches
+                    if nafdac_number:
+                        if result['nrn'].upper() == nafdac_number.upper():
+                            results.append(result)
+                            logger.info(f"Exact match found: {result['product_name']} (NRN: {result['nrn']})")
+                        else:
+                            logger.info(f"Skipping non-match: {result['nrn']} != {nafdac_number}")
+                    else:
+                        # For product name search, include all results
+                        results.append(result)
+                        logger.info(f"Found product by name: {result['product_name']}")
             
             driver.quit()
             
@@ -143,36 +156,10 @@ def scrape_nafdac_greenbook(nafdac_number: str = None, product_name: str = None)
             
     except Exception as e:
         logger.error(f"Error scraping NAFDAC Greenbook: {str(e)}")
-        return get_dummy_validation_result(nafdac_number or product_name)
-
-
-def get_dummy_validation_result(nafdac_number: str) -> dict:
-    """
-    Return dummy data for testing when scraping fails
-    """
-    logger.warning(f"Using dummy data for {nafdac_number}")
-    
-    if nafdac_number == "A4-101466":
         return {
-            "success": True,
-            "nafdacNumber": nafdac_number,
-            "found": True,
-            "results": [
-                {
-                    "product_name": "Paracetamol 500mg Tablets",
-                    "active_ingredients": "Paracetamol",
-                    "product_category": "Drugs",
-                    "nrn": "A4-101466",
-                    "status": "Active"
-                }
-            ]
-        }
-    else:
-        return {
-            "success": True,
-            "nafdacNumber": nafdac_number,
-            "found": False,
-            "message": "Product not found in NAFDAC Greenbook"
+            "success": False,
+            "error": f"Failed to validate: {str(e)}",
+            "message": "Unable to connect to NAFDAC Greenbook. Please try again later."
         }
 
 
